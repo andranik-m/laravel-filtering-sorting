@@ -3,38 +3,37 @@
 namespace App\Providers;
 
 
+use Illuminate\Database\Eloquent\Builder as ElBuilder;
+use Illuminate\Database\Eloquent\Builder;
+
 abstract class AbstractSorter
 {
-    use SmartOrders;
+    use SorterHelpers;
 
-    public function __construct(Request $request)
+    private $dataManager;
+    private $query;
+
+    public function __construct(DataManager $dataManager)
     {
-        $this->setRequest($request);
+        $this->dataManager = $dataManager;
     }
 
-    abstract protected function joinRulesMap(): array;
     abstract protected function orders(): array;
 
-    protected function filterUsingRules(): parent
+    /**
+     * @param Builder|ElBuilder $query
+     * @return Builder|ElBuilder
+     */
+    public function handle($query)
     {
-        $relations = [];
+        $this->setQuery($query)->applyOrder();
 
-        foreach ($this->optimiseRules() as  $requestKey => $options) {
-            $this->filterApplier($this->query, $requestKey, $options, $relations);
-        }
-
-        $this->handleRelations($relations, $this->query);
-
-        return $this;
+        return $this->query;
     }
 
-    protected function applyOrder(): parent
+    protected function applyOrder(): self
     {
-        if (! $this->withOrders) {
-            return $this;
-        }
-
-        foreach ((array) $this->request->order_by as $column => $direction) {
+        foreach ((array) $this->dataManager->get('order_by', []) as $column => $direction) {
 
             if (! array_key_exists($column, ($orders = $this->getOrders()))) {
                 continue;
@@ -58,29 +57,42 @@ abstract class AbstractSorter
         return $this;
     }
 
-    private function optimiseRules(): array
-    {
-        $rules = $this->getRules();
+//    private function optimiseRules(): array
+//    {
+//        $rules = $this->getRules();
+//
+//        foreach ($this->joined as $table) {
+//            $rules = array_merge($rules, $this->getOptimisedRulesByTable($table));
+//        }
+//
+//        return $rules;
+//    }
 
-        foreach ($this->joined as $table) {
-            $rules = array_merge($rules, $this->getOptimisedRulesByTable($table));
-        }
-
-        return $rules;
-    }
-
-    protected function getOptimisedRulesByTable(string $table): array
-    {
-        return $this->joinRulesMap()[$table] ?? [];
-    }
+//    protected function getOptimisedRulesByTable(string $table): array
+//    {
+//        return $this->joinRulesMap()[$table] ?? [];
+//    }
 
     protected function getOrders(): array
     {
         return $this->orders();
     }
 
-    protected function getRules(): array
+    protected function joinRulesMap(): array
     {
-        return $this->rules();
+        return [
+            //
+        ];
+    }
+
+    /**
+     * @param Builder|ElBuilder $query
+     * @return self
+     */
+    private function setQuery($query): self
+    {
+        $this->query = $query;
+
+        return $this;
     }
 }

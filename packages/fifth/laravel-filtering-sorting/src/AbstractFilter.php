@@ -15,9 +15,11 @@ abstract class AbstractFilter
 
     protected $withOrders = true;
 
-    protected $orderColumnMap = [];
+    protected $nullableKeys = [];
 
-    public function __construct(FilterDataManager $manager)
+    abstract protected function rules(): array;
+
+    public function __construct(DataManager $manager)
     {
         $this->dataManager = $manager;
     }
@@ -26,30 +28,27 @@ abstract class AbstractFilter
      * @param Builder|ElBuilder $query
      * @return Builder|ElBuilder
      */
-
     public function handle($query)
     {
-        $this->setQuery($query)
-            ->applyOrder()
-            ->filterUsingRules();
+        $this->setQuery($query)->filterUsingRules();
 
         return $this->query;
     }
 
-    protected function applyOrder(): self
-    {
-        if (!$this->withOrders) {
-            return $this;
-        }
-
-        foreach ((array) $this->dataManager->order_by ?? [] as $column => $direction) {
-            if (!array_key_exists($column, $this->orderColumnMap)) continue;
-
-            $this->query->orderBy($this->orderColumnMap[$column], $direction);
-        }
-
-        return $this;
-    }
+//    protected function applyOrder(): self
+//    {
+//        if (!$this->withOrders) {
+//            return $this;
+//        }
+//
+//        foreach ((array) $this->dataManager->order_by ?? [] as $column => $direction) { // @TODO data manager order by fix
+//            if (!array_key_exists($column, $this->orderColumnMap)) continue;
+//
+//            $this->query->orderBy($this->orderColumnMap[$column], $direction);
+//        }
+//
+//        return $this;
+//    }
 
     protected function setQuery($query): self
     {
@@ -73,11 +72,7 @@ abstract class AbstractFilter
 
     protected function filterApplier($query, string $requestKey, array $options, &$relations): void
     {
-        if (
-            array_search($requestKey, $this->nullableKeys ?? []) === false ?
-                !$this->dataManager->has($requestKey) :
-                !$this->dataManager->exists($requestKey)
-        ) {
+        if ($this->shouldFilter($requestKey)) {
             return;
         }
 
@@ -177,5 +172,12 @@ abstract class AbstractFilter
             [$query, $params['queryMethod'] ?? 'where'],
             $arguments
         );
+    }
+
+    private function shouldFilter(string $requestKey): bool
+    {
+        return array_search($requestKey, $this->nullableKeys) === false ?
+            !(is_null($this->dataManager->get($requestKey))) :
+            !$this->dataManager->has($requestKey);
     }
 }
