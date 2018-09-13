@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Builder;
 
 trait FilterHelpers
 {
+    //@TODO filtering timezone, date, endofDay
     protected function dateFilter(Builder $query, string $requestKey, array $options): void
     {
         if (!key_exists('operator', $options)){
@@ -80,19 +81,11 @@ trait FilterHelpers
     protected function params(string $column, string $queryMethod = 'whereIn'): array
     {
         return [
-            'params'    => [
-                'column'        => $column,
-                'queryMethod'   => $queryMethod
+            'params' => [
+                'column' => $column,
+                'queryMethod' => $queryMethod
             ]
         ];
-    }
-
-    // @TODO remove
-    public function setOrdering(bool $withOrders): self
-    {
-        $this->withOrders = $withOrders;
-
-        return $this;
     }
 
     private function applySearch(Builder $query, string $requestKey, array $options)
@@ -100,7 +93,7 @@ trait FilterHelpers
         $query->where(function (Builder $query) use ($requestKey, $options) {
             foreach ((array) $this->request->get($requestKey) as $search) {
                 foreach ($options['searchIn'] as $searchableColumn) {
-                    $query->orWhere($searchableColumn, 'like', $search . '%');
+                    $query->orWhere($searchableColumn, 'like', $search . '%'); // @TODO percents
                 }
             }
         });
