@@ -6,6 +6,7 @@ namespace App\Providers;
 use Illuminate\Database\Eloquent\Builder as ElBuilder;
 use Illuminate\Database\Eloquent\Builder;
 
+//@TODO function accessibility
 abstract class AbstractSorter
 {
     use SorterHelpers;
@@ -56,22 +57,6 @@ abstract class AbstractSorter
 
         return $this;
     }
-
-//    private function optimiseRules(): array
-//    {
-//        $rules = $this->getRules();
-//
-//        foreach ($this->joined as $table) {
-//            $rules = array_merge($rules, $this->getOptimisedRulesByTable($table));
-//        }
-//
-//        return $rules;
-//    }
-
-//    protected function getOptimisedRulesByTable(string $table): array
-//    {
-//        return $this->joinRulesMap()[$table] ?? [];
-//    }
 
     protected function getOrders(): array
     {

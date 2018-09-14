@@ -3,6 +3,8 @@
 namespace App\Providers;
 
 
+use Illuminate\Database\Eloquent\Builder;
+
 trait SorterHelpers
 {
     protected $joined = [];

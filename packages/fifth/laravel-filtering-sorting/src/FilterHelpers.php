@@ -7,24 +7,29 @@ use Illuminate\Database\Eloquent\Builder;
 
 trait FilterHelpers
 {
-    //@TODO filtering timezone, date, endofDay
+    //@TODO db raw date
     protected function dateFilter(Builder $query, string $requestKey, array $options): void
     {
         if (!key_exists('operator', $options)){
-            throw new \Exception("Operator is required on '$requestKey'");
+            throwException(new \Exception("Operator is required on '$requestKey'"));
         } elseif (!key_exists('column', $options)){
-            throw new \Exception("Column is required on '$requestKey'");
+            throwException(new \Exception("Column is required on '$requestKey'"));
         }
 
         try {
-            $date = Carbon::parse($this->request->$requestKey);
+            $date = Carbon::parse($this->dataManager->get($requestKey));
         } catch (\Exception $e) {
-            throw new \Exception('Invalid parameter for date filter');
+            throwException(new \Exception('Invalid parameter for date filter'));
         }
 
         if ($options['endOfDay'] ?? false) $date->endOfDay();
 
-        $query->where($options['column'], $options['operator'], convertUserTimezoneToUTC($date));
+        $query->where($options['column'], $options['operator'], $this->modifyDate($date));
+    }
+
+    protected function modifyDate(Carbon $date): Carbon
+    {
+        return $date;
     }
 
     protected function dateParams(string $column, string $operator = '>=', bool $endOfDay = false) : array
@@ -62,8 +67,9 @@ trait FilterHelpers
 
     protected function getRule(array &$remainingRelations, $column, $queryMethod = 'whereIn') : array
     {
-        if (empty($remainingRelations))
+        if (empty($remainingRelations)) {
             return $this->getRelationParams($column, $queryMethod);
+        }
 
         return $this->relationFilter(implode('.', $remainingRelations), $column, $queryMethod);
     }
@@ -78,6 +84,7 @@ trait FilterHelpers
         ];
     }
 
+    //@TODO simple
     protected function params(string $column, string $queryMethod = 'whereIn'): array
     {
         return [
@@ -91,7 +98,7 @@ trait FilterHelpers
     private function applySearch(Builder $query, string $requestKey, array $options)
     {
         $query->where(function (Builder $query) use ($requestKey, $options) {
-            foreach ((array) $this->request->get($requestKey) as $search) {
+            foreach ((array) $this->dataManager->get($requestKey) as $search) {
                 foreach ($options['searchIn'] as $searchableColumn) {
                     $query->orWhere($searchableColumn, 'like', $search . '%'); // @TODO percents
                 }
@@ -99,6 +106,7 @@ trait FilterHelpers
         });
     }
 
+    // #TODO search
     protected function searchParams($searchIn): array
     {
         return [

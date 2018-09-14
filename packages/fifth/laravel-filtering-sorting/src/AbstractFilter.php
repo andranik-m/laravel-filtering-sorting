@@ -4,7 +4,9 @@ namespace App\Providers;
 
 use Illuminate\Database\Eloquent\Builder as ElBuilder;
 use Illuminate\Database\Query\Builder;
+use Illuminate\Http\Request;
 
+//@TODO function accessibility
 abstract class AbstractFilter
 {
     use FilterHelpers;
@@ -13,13 +15,15 @@ abstract class AbstractFilter
 
     protected $query;
 
-    protected $withOrders = true;
-
+    private $joined = [];
     protected $nullableKeys = [];
 
     abstract protected function rules(): array;
 
-    public function __construct(DataManager $manager)
+    /**
+     * @param DataManager|Request $manager
+     */
+    public function __construct($manager)
     {
         $this->dataManager = $manager;
     }
@@ -35,26 +39,31 @@ abstract class AbstractFilter
         return $this->query;
     }
 
-//    protected function applyOrder(): self
-//    {
-//        if (!$this->withOrders) {
-//            return $this;
-//        }
-//
-//        foreach ((array) $this->dataManager->order_by ?? [] as $column => $direction) { // @TODO data manager order by fix
-//            if (!array_key_exists($column, $this->orderColumnMap)) continue;
-//
-//            $this->query->orderBy($this->orderColumnMap[$column], $direction);
-//        }
-//
-//        return $this;
-//    }
-
+    /**
+     * @param Builder|ElBuilder $query
+     * @return AbstractFilter
+     */
     protected function setQuery($query): self
     {
         $this->query = $query;
 
         return $this;
+    }
+
+    protected function optimiseRules(): array
+    {
+        $rules = $this->rules();
+
+        foreach ($this->joined as $table) {
+            $rules = array_merge($rules, $this->getOptimisedRulesByTable($table));
+        }
+
+        return $rules;
+    }
+
+    protected function getOptimisedRulesByTable(string $table): array
+    {
+        return $this->joinRulesMap()[$table] ?? [];
     }
 
     protected function filterUsingRules(): self
@@ -81,7 +90,7 @@ abstract class AbstractFilter
         $method = $options['action'] ?? 'simple';
 
         if (!(in_array($method, $magicMethods) || method_exists($this, $method))) {
-            throw new \Exception("Method '$method' not found");
+            throwException(new \Exception("Method '$method' not found"));
         }
 
         $this->applyMethod($method, $requestKey, $options, $query, $relations);
@@ -124,9 +133,9 @@ abstract class AbstractFilter
     private function collectRelations(string $requestKey, array $options, array &$relations): void
     {
         if (!key_exists('relationName', $options)) {
-            throw new \Exception("RelationName is required on '$requestKey'");
+            throwException(new \Exception("RelationName is required on '$requestKey'"));
         } elseif (!key_exists('rule', $options)) {
-            throw new \Exception("Rule is required on '$requestKey'");
+            throwException(new \Exception("Rule is required on '$requestKey'"));
         }
 
         $relations[$options['relationName']][$requestKey] = $options['rule'];
@@ -150,27 +159,12 @@ abstract class AbstractFilter
     private function simple($query, $requestKey, $params): void
     {
         if (!key_exists('column', $params)) {
-            throw new \Exception("Column is required on '$requestKey'");
+            throwException(new \Exception("Column is required on '$requestKey'"));
         }
-
-        $arguments = key_exists('operator', $params)
-            ? [$params['column'], $params['operator'], $this->dataManager->get($requestKey)]
-            : [$params['column'], $this->dataManager->get($requestKey)];
-
-        //@TODO clean code
-        if (isset($params['queryMethod'])) {
-            if (strcasecmp($params['queryMethod'], 'whereRaw') == 0) {
-                $operator = $params['operator'] ?? '=';
-                $arguments = [$params['column'] . $operator . "'" . $this->dataManager->get($requestKey) . "'"];
-            } elseif (strcasecmp($params['queryMethod'], 'whereIn') == 0) {
-                $arguments[1] = (array)$arguments[1]; //second item is values, so for whereIn we cast it to array (just in case)
-            }
-        }
-        //END
 
         call_user_func_array(
-            [$query, $params['queryMethod'] ?? 'where'],
-            $arguments
+            [$query, $this->getQueryMethod($params)],
+            $this->getArguments($requestKey, $params)
         );
     }
 
@@ -179,5 +173,34 @@ abstract class AbstractFilter
         return array_search($requestKey, $this->nullableKeys) === false ?
             !(is_null($this->dataManager->get($requestKey))) :
             !$this->dataManager->has($requestKey);
+    }
+
+    protected function getArguments(string $requestKey, array $params)
+    {
+        $operator = $params['operator'] ?? '=';
+
+        switch ($this->getQueryMethod($params)) {
+
+            case 'whereIn':
+                return (array) $this->dataManager->get($requestKey, []);
+
+            case 'whereRaw':
+                return "{$params['column']} {$operator} '{$this->dataManager->get($requestKey)}'";
+
+            default :
+                return [$params['column'], $operator, $this->dataManager->get($requestKey)];
+        }
+    }
+
+    protected function getQueryMethod(array $params): string
+    {
+        return $params['queryMethod'] ?? 'where';
+    }
+
+    protected function joinRulesMap(): array
+    {
+        return [
+            //
+        ];
     }
 }
