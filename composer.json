@@ -9,6 +9,6 @@
             "email": "andranik@fifth-llc.com"
         }
     ],
-    "minimum-stability": "dev",
+    "minimum-stability": "dev-master",
     "require": {}
 }
