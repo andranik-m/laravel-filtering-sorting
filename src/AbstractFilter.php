@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Providers;
+namespace ASD;
 
 use Illuminate\Database\Eloquent\Builder as ElBuilder;
 use Illuminate\Database\Query\Builder;
