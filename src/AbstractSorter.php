@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Providers;
+namespace FifthLLC\LaravelFilteringSorting;
 
 
 use Illuminate\Database\Eloquent\Builder as ElBuilder;
